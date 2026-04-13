@@ -23,10 +23,11 @@ TRANSCRIPT_BATCH_SIZE = 20  # 每批转录 & 写入的数量
 
 # 本地 FunASR 模型（延迟加载）
 _asr_model = None
+_punc_model = None
 
 
 def _get_asr_model():
-    """延迟加载本地 FunASR Paraformer 模型（含 VAD + 标点）。"""
+    """延迟加载本地 FunASR Paraformer 模型（含 VAD）。"""
     global _asr_model
     if _asr_model is None:
         from funasr import AutoModel
@@ -34,20 +35,55 @@ def _get_asr_model():
         _asr_model = AutoModel(
             model="iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
             vad_model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
-            pnc_model="iic/punc_ct-transformer_cn-en-common-vocab471067-large",
         )
         logger.info("  模型加载完成")
     return _asr_model
 
 
+def _get_punc_model():
+    """延迟加载标点恢复模型。"""
+    global _punc_model
+    if _punc_model is None:
+        from funasr import AutoModel
+        logger.info("  加载标点恢复模型...")
+        _punc_model = AutoModel(
+            model="iic/punc_ct-transformer_cn-en-common-vocab471067-large",
+        )
+        logger.info("  标点模型加载完成")
+    return _punc_model
+
+
+def _clean_transcript(text: str) -> str:
+    """清理 FunASR 转录输出：去字符间空格，保留英文单词间空格和标点。"""
+    import re
+    # 多轮去除中文字符之间的空格
+    prev = None
+    while prev != text:
+        prev = text
+        text = re.sub(r'([\u4e00-\u9fff])\s+([\u4e00-\u9fff])', r'\1\2', text)
+    # 中文与英文/数字间的多余空格也去除
+    text = re.sub(r'([\u4e00-\u9fff])\s+([a-zA-Z0-9])', r'\1\2', text)
+    text = re.sub(r'([a-zA-Z0-9])\s+([\u4e00-\u9fff])', r'\1\2', text)
+    return text.strip()
+
+
 def _transcribe_audio(audio_path: str) -> Optional[str]:
-    """使用本地 FunASR Paraformer 转录。"""
+    """使用本地 FunASR Paraformer 转录（含标点恢复）。"""
     try:
         model = _get_asr_model()
         result = model.generate(input=audio_path, batch_size_s=300)
         if result and len(result) > 0:
             text = result[0].get("text", "").strip()
+            text = _clean_transcript(text)
             if text:
+                # 单独调用标点恢复模型
+                try:
+                    punc_model = _get_punc_model()
+                    punc_res = punc_model.generate(input=text)
+                    if punc_res and punc_res[0].get("text"):
+                        text = punc_res[0]["text"]
+                except Exception as exc:
+                    logger.warning("  标点恢复失败（不影响转录）: %s", exc)
                 logger.info("  转录完成: %d 字", len(text))
                 return text
         return ""
