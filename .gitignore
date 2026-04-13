@@ -1,0 +1,19 @@
+# Virtual environment
+.venv/
+
+# Environment variables (contains API keys)
+.env
+
+# Cookie data (contains login credentials)
+cookie_data/*.json
+
+# User data
+data/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
