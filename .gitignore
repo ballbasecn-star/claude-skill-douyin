@@ -4,3 +4,5 @@ cookie_data/
 data/
 __pycache__/
 *.pyc
+*.bak
+.env.*
