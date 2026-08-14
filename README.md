@@ -1,3 +1,5 @@
+
+
 # claude-skill-douyin
 
 Claude Code skill: 抖音视频解析、博主视频抓取/转录/AI运营分析、写入飞书多维表格。
@@ -66,6 +68,9 @@ PYTHON=".venv/bin/python"
 
 # 抓取最新 20 条视频
 $PYTHON scripts/cli.py fetch "博主主页链接"
+
+# 抓取指定数量（如 50 条）
+$PYTHON scripts/cli.py fetch "博主主页链接" --count 50
 
 # 抓取全部视频
 $PYTHON scripts/cli.py fetch "博主主页链接" --all
